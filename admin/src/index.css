@@ -1,0 +1,49 @@
+:root {
+  --bg-color: #f4f6f8;
+  --surface: #ffffff;
+  --text-main: #1f2937;
+  --text-muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --accent: #e8212b; /* easyfoot red */
+  --sidebar-bg: #0f172a; /* easyfoot navy dark */
+  --sidebar-text: #f8fafc;
+  --radius: 8px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg-color); color: var(--text-main); }
+
+/* Layout */
+.admin-layout { display: flex; min-height: 100vh; }
+
+/* Sidebar */
+.sidebar { width: 260px; background: var(--sidebar-bg); color: var(--sidebar-text); display: flex; flex-direction: column; }
+.sidebar-header { padding: 24px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight: bold; font-size: 20px; display: flex; align-items: center; gap: 12px; }
+.sidebar-nav { padding: 16px 0; display: flex; flex-direction: column; gap: 4px; }
+.nav-item { padding: 12px 24px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 12px; font-weight: 500; transition: 0.2s; }
+.nav-item:hover, .nav-item.active { background: rgba(255,255,255,0.05); color: #fff; border-left: 3px solid var(--accent); }
+
+/* Main Content */
+.main-content { flex: 1; padding: 32px 48px; display: flex; flex-direction: column; overflow-y: auto; }
+.page-title { font-size: 28px; font-weight: 700; margin-bottom: 24px; color: #111827; }
+
+/* Cards & Tables */
+.card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); padding: 24px; margin-bottom: 24px; }
+table { width: 100%; border-collapse: collapse; text-align: left; }
+th { padding: 12px 16px; border-bottom: 2px solid var(--border); color: var(--text-muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+td { padding: 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+tr:hover { background-color: #f9fafb; }
+
+/* Forms & Buttons */
+.btn { padding: 8px 16px; border-radius: 6px; font-weight: 500; cursor: pointer; border: none; transition: 0.2s; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-danger { background: #fee2e2; color: #dc2626; }
+.btn-danger:hover { background: #fecaca; }
+.form-group { margin-bottom: 16px; }
+.form-label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 14px; }
+.form-control { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; font-size: 14px; }
+.form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+textarea.form-control { resize: vertical; min-height: 100px; }
