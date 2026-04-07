@@ -68,15 +68,23 @@ async function apiRequest(path, params) {
   const requestPromise = (async () => {
     let response;
     let data;
+    let rawText = '';
 
     try {
       response = await fetch(`${API_BASE_URL}${cacheKey}`, {
         signal: controller.signal,
       });
-      data = await response.json().catch(() => ({}));
+      rawText = await response.text();
+      data = rawText ? JSON.parse(rawText) : {};
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         throw new Error('The API took too long to respond.');
+      }
+
+      if (error instanceof SyntaxError) {
+        const statusDetails = response ? ` (${response.status} ${response.statusText})` : '';
+        const preview = rawText.trim().slice(0, 180);
+        throw new Error(preview ? `Unexpected API response${statusDetails}: ${preview}` : `Unexpected API response${statusDetails}.`);
       }
 
       throw error;
@@ -85,7 +93,10 @@ async function apiRequest(path, params) {
     }
 
     if (!response.ok) {
-      const message = data.message || `The API request failed for ${path}.`;
+      const fallback = rawText.trim().replace(/\s+/g, ' ').slice(0, 180);
+      const message =
+        data.message ||
+        (fallback ? `${fallback} (${response.status})` : `The API request failed for ${path} (${response.status}).`);
       const rateLimitDelay = getRateLimitDelay(message);
 
       if (rateLimitDelay > 0) {
