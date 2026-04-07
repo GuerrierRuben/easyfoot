@@ -14,20 +14,16 @@ import {
   getMatchDetails,
   getTeamProfile,
 } from './services/footballData.js';
+import { getLatestNews } from './services/news.js';
 
-const NEWS = [
+const FALLBACK_NEWS = [
   { id: 1, cat: 'Premier League', date: 'April 1, 2026', img: '/news_action.png', title: 'Salah reaches 30 goals in a single PL season', excerpt: "Mohamed Salah scored his 30th Premier League goal of the season in Liverpool's 2-1 win over Arsenal, equalling his own record set in 2017/18." },
   { id: 2, cat: 'Champions League', date: 'April 1, 2026', img: '/news_celebration.png', title: 'Real Madrid edge PSG in quarter-final first leg', excerpt: "Jude Bellingham's late header gave Real Madrid a narrow advantage after a tense first leg at the Bernabeu." },
   { id: 3, cat: 'La Liga', date: 'March 31, 2026', img: '/news_lineup.png', title: 'El Clasico draw keeps title race open', excerpt: "Barcelona and Real Madrid shared a dramatic draw, leaving the title race alive heading into the final stretch." },
-];
-
-const LATEST_NEWS = [
   { id: 4, cat: 'Transfer', date: 'March 31, 2026', img: '/news_action.png', title: 'Bayern Munich open talks for Wirtz', excerpt: 'Bayer Leverkusen have reportedly received a formal approach as transfer speculation heats up.' },
   { id: 5, cat: 'Serie A', date: 'March 31, 2026', img: '/news_celebration.png', title: 'Lautaro leads Inter to derby win', excerpt: 'Inter moved one step closer to the summit with a composed derby performance.' },
   { id: 6, cat: 'Bundesliga', date: 'March 30, 2026', img: '/news_lineup.png', title: 'Kane hat-trick fires Bayern', excerpt: 'Harry Kane produced another headline performance as Bayern controlled Der Klassiker.' },
 ];
-
-const ALL_NEWS = [...NEWS, ...LATEST_NEWS, ...NEWS];
 const NAV_MENU = ['Home', 'News', 'Scores', 'Tables', 'Quiz', 'About Us'];
 
 function StatusCard({ title, message, actionLabel, onAction }) {
@@ -301,7 +297,7 @@ function MatchDetailsModal({ match, loading, error, onClose }) {
   );
 }
 
-function NewsGrid({ onNewsClick }) {
+function NewsGrid({ newsItems, onNewsClick }) {
   return (
     <div className="top-news-section" onClick={onNewsClick}>
       <div className="section-title-bar">
@@ -309,7 +305,7 @@ function NewsGrid({ onNewsClick }) {
         <h2>Top News</h2>
       </div>
       <div className="news-grid" style={{ paddingTop: 16 }}>
-        {NEWS.map((item, index) => (
+        {newsItems.map((item, index) => (
           <motion.div key={item.id} className="news-card" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.08 }}>
             <div className="news-card-img-wrap">
               <img className="news-card-img" src={item.img} alt={item.title} />
@@ -527,6 +523,7 @@ export default function App() {
   const [teamProfileState, setTeamProfileState] = useState({ loading: false, error: '' });
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [matchDetailsState, setMatchDetailsState] = useState({ match: null, loading: false, error: '', open: false });
+  const [newsState, setNewsState] = useState({ items: FALLBACK_NEWS, loading: true, error: '' });
 
   function retryScoresLoad() {
     setScoresState((current) => ({ ...current, loaded: false }));
@@ -537,6 +534,25 @@ export default function App() {
     setTablesState({ data: {}, loading: false, error: '', loaded: false });
     setTablesReloadKey((value) => value + 1);
   }
+
+  useEffect(() => {
+    async function loadNews() {
+      setNewsState((current) => ({ ...current, loading: true, error: '' }));
+
+      try {
+        const items = await getLatestNews(12);
+        setNewsState({ items: items.length ? items : FALLBACK_NEWS, loading: false, error: '' });
+      } catch (error) {
+        setNewsState({
+          items: FALLBACK_NEWS,
+          loading: false,
+          error: error instanceof Error ? error.message : 'Unable to load live news.',
+        });
+      }
+    }
+
+    loadNews();
+  }, []);
 
   useEffect(() => {
     if (!searchQuery.trim() || searchState.teams.length || searchState.loading) {
@@ -798,7 +814,7 @@ export default function App() {
           />
           <div className="page-body">
             <div className="container">
-              <NewsGrid onNewsClick={() => setActiveNav('News')} />
+              <NewsGrid newsItems={newsState.items.slice(0, 3)} onNewsClick={() => setActiveNav('News')} />
               <div className="main-grid" style={{ marginTop: 28 }}>
                 <div>
                   <FeaturedPanel
@@ -830,7 +846,7 @@ export default function App() {
       {activeNav === 'News' && (
         <div className="page-body">
           <div className="container">
-            <NewsPage newsItems={ALL_NEWS} />
+            <NewsPage newsItems={newsState.items} />
           </div>
         </div>
       )}
