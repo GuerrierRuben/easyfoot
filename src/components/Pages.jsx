@@ -86,33 +86,18 @@ export function ScoresPage({ results, fixtures, onMatchClick }) {
   );
 }
 
-export function TablesPage({ standingsData, leagues, activeLeague, onLeagueChange, onTeamClick }) {
-  const currentLeague = leagues.find((league) => league.code === activeLeague) || leagues[0];
-
+export function TablesPage({ standingsData, leagues, onTeamClick }) {
   return (
     <motion.div className="page-container tables-page" initial={{opacity:0}} animate={{opacity:1}}>
-      <div className="widget-header" style={{ marginBottom: 18 }}>
-        <h3>League Tables</h3>
-        <div className="widget-header-tabs">
-          {leagues.map((league) => (
-            <button
-              key={league.code}
-              className={`widget-header-tab ${activeLeague === league.code ? 'active' : ''}`}
-              onClick={() => onLeagueChange(league.code)}
-            >
-              {league.shortName}
-            </button>
-          ))}
+      {leagues.map((league) => (
+        <div key={league.code} className="table-block">
+          <div className="section-title-bar">
+            <div className="stb-accent" />
+            <h2>{league.name}</h2>
+          </div>
+          <StandingsTable data={standingsData[league.code] || []} onTeamClick={onTeamClick} />
         </div>
-      </div>
-
-      <div className="table-block">
-        <div className="section-title-bar">
-          <div className="stb-accent" />
-          <h2>{currentLeague.name}</h2>
-        </div>
-        <StandingsTable data={standingsData[currentLeague.code] || []} onTeamClick={onTeamClick} />
-      </div>
+      ))}
     </motion.div>
   );
 }

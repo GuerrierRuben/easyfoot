@@ -519,7 +519,6 @@ export default function App() {
   const [tickerState, setTickerState] = useState({ matches: [], loading: true, error: '' });
   const [scoresState, setScoresState] = useState({ results: [], fixtures: [], loading: false, error: '', loaded: false });
   const [tablesState, setTablesState] = useState({ data: {}, loading: false, error: '', loaded: false });
-  const [tablesCompetition, setTablesCompetition] = useState(COMPETITIONS[0].code);
   const [searchState, setSearchState] = useState({ teams: [], loading: false });
   const [searchQuery, setSearchQuery] = useState('');
   const [scoresReloadKey, setScoresReloadKey] = useState(0);
@@ -535,11 +534,7 @@ export default function App() {
   }
 
   function retryTablesLoad() {
-    setTablesState((current) => ({
-      ...current,
-      data: Object.fromEntries(Object.entries(current.data).filter(([code]) => code !== tablesCompetition)),
-      loaded: false,
-    }));
+    setTablesState({ data: {}, loading: false, error: '', loaded: false });
     setTablesReloadKey((value) => value + 1);
   }
 
@@ -674,7 +669,19 @@ export default function App() {
   }, [activeNav, scoresState.loaded, scoresState.loading, scoresReloadKey]);
 
   useEffect(() => {
-    if (activeNav !== 'Tables' || tablesState.loading || tablesState.data[tablesCompetition]) {
+    if (widgetStandings.rows.length) {
+      setTablesState((current) => ({
+        ...current,
+        data: {
+          ...current.data,
+          [widgetCompetition]: widgetStandings.rows,
+        },
+      }));
+    }
+  }, [widgetCompetition, widgetStandings.rows]);
+
+  useEffect(() => {
+    if (activeNav !== 'Tables' || tablesState.loading || tablesState.loaded) {
       return;
     }
 
@@ -682,15 +689,26 @@ export default function App() {
       setTablesState((current) => ({ ...current, loading: true, error: '' }));
 
       try {
-        const standings = await getCompetitionStandings(tablesCompetition);
+        const competitionsToLoad = COMPETITIONS.filter((competition) => !tablesState.data[competition.code]);
+        const bundles = await Promise.allSettled(
+          competitionsToLoad.map(async (competition) => {
+            const standings = await getCompetitionStandings(competition.code);
+            return [competition.code, standings.rows];
+          }),
+        );
+
+        const successfulBundles = bundles
+          .filter((bundle) => bundle.status === 'fulfilled')
+          .map((bundle) => bundle.value);
+        const failedBundles = bundles.filter((bundle) => bundle.status === 'rejected');
 
         setTablesState({
           data: {
             ...tablesState.data,
-            [tablesCompetition]: standings.rows,
+            ...Object.fromEntries(successfulBundles),
           },
           loading: false,
-          error: '',
+          error: failedBundles.length ? 'Some competitions could not be loaded with the current API access.' : '',
           loaded: true,
         });
       } catch (error) {
@@ -704,7 +722,7 @@ export default function App() {
     }
 
     loadTablesPage();
-  }, [activeNav, tablesCompetition, tablesState.data, tablesState.loading, tablesReloadKey]);
+  }, [activeNav, tablesState.data, tablesState.loaded, tablesState.loading, tablesReloadKey]);
 
   async function handleTeamClick(team) {
     setActiveNav('TeamProfile');
@@ -800,10 +818,7 @@ export default function App() {
                     error={widgetStandings.error}
                     onCompetitionChange={setWidgetCompetition}
                     onTeamClick={handleTeamClick}
-                    onViewFull={() => {
-                      setTablesCompetition(widgetCompetition);
-                      setActiveNav('Tables');
-                    }}
+                    onViewFull={() => setActiveNav('Tables')}
                   />
                 </div>
               </div>
@@ -853,8 +868,6 @@ export default function App() {
                   <TablesPage
                     standingsData={tablesState.data}
                     leagues={COMPETITIONS}
-                    activeLeague={tablesCompetition}
-                    onLeagueChange={setTablesCompetition}
                     onTeamClick={handleTeamClick}
                   />
                 </>
@@ -865,8 +878,6 @@ export default function App() {
               <TablesPage
                 standingsData={tablesState.data}
                 leagues={COMPETITIONS}
-                activeLeague={tablesCompetition}
-                onLeagueChange={setTablesCompetition}
                 onTeamClick={handleTeamClick}
               />
             )}
