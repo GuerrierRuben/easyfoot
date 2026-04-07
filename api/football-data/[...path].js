@@ -1,5 +1,19 @@
 const FOOTBALL_DATA_BASE_URL = 'https://api.football-data.org/v4';
 
+function extractErrorMessage(contentType, body, statusText) {
+  if (contentType.includes('application/json')) {
+    try {
+      const parsed = JSON.parse(body);
+      return parsed.message || parsed.error || statusText || 'Upstream API request failed.';
+    } catch {
+      return statusText || 'Upstream API request failed.';
+    }
+  }
+
+  const compactText = body.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  return compactText || statusText || 'Upstream API request failed.';
+}
+
 function setCorsHeaders(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
@@ -68,6 +82,14 @@ export default async function handler(req, res) {
 
     const contentType = upstreamResponse.headers.get('content-type') || 'application/json; charset=utf-8';
     const body = await upstreamResponse.text();
+
+    if (!upstreamResponse.ok) {
+      sendJson(res, upstreamResponse.status, {
+        message: extractErrorMessage(contentType, body, upstreamResponse.statusText),
+        upstreamStatus: upstreamResponse.status,
+      });
+      return;
+    }
 
     res.status(upstreamResponse.status);
     res.setHeader('Content-Type', contentType);
