@@ -519,12 +519,11 @@ export default function App() {
   const [tickerState, setTickerState] = useState({ matches: [], loading: true, error: '' });
   const [scoresState, setScoresState] = useState({ results: [], fixtures: [], loading: false, error: '', loaded: false });
   const [tablesState, setTablesState] = useState({ data: {}, loading: false, error: '', loaded: false });
-  const [searchState, setSearchState] = useState({ teams: [], loading: true });
+  const [tablesCompetition, setTablesCompetition] = useState(COMPETITIONS[0].code);
+  const [searchState, setSearchState] = useState({ teams: [], loading: false });
   const [searchQuery, setSearchQuery] = useState('');
   const [scoresReloadKey, setScoresReloadKey] = useState(0);
   const [tablesReloadKey, setTablesReloadKey] = useState(0);
-  const [featuredState, setFeaturedState] = useState({ featuredTeam: null, featuredMatch: null, loading: true });
-  const [featuredTeamIndex, setFeaturedTeamIndex] = useState(0);
   const [selectedSquad, setSelectedSquad] = useState(null);
   const [teamProfileState, setTeamProfileState] = useState({ loading: false, error: '' });
   const [selectedPlayer, setSelectedPlayer] = useState(null);
@@ -536,11 +535,19 @@ export default function App() {
   }
 
   function retryTablesLoad() {
-    setTablesState((current) => ({ ...current, loaded: false }));
+    setTablesState((current) => ({
+      ...current,
+      data: Object.fromEntries(Object.entries(current.data).filter(([code]) => code !== tablesCompetition)),
+      loaded: false,
+    }));
     setTablesReloadKey((value) => value + 1);
   }
 
   useEffect(() => {
+    if (!searchQuery.trim() || searchState.teams.length || searchState.loading) {
+      return;
+    }
+
     async function loadSearchTeams() {
       setSearchState({ teams: [], loading: true });
 
@@ -563,66 +570,7 @@ export default function App() {
     }
 
     loadSearchTeams();
-  }, []);
-
-  useEffect(() => {
-    async function loadFeaturedContent() {
-      setFeaturedState({ featuredTeam: null, featuredMatch: null, loading: true });
-
-      const teamCandidates = searchState.teams.slice(0, 1);
-
-      try {
-        const bundles = await Promise.allSettled(
-          COMPETITIONS.map(async (competition) => {
-            const [results, fixtures] = await Promise.all([
-              getCompetitionResults(competition.code, 1),
-              getCompetitionFixtures(competition.code, 1),
-            ]);
-
-            return { results, fixtures };
-          }),
-        );
-
-        const matches = bundles
-          .filter((bundle) => bundle.status === 'fulfilled')
-          .flatMap((bundle) => [...bundle.value.results, ...bundle.value.fixtures])
-          .filter(Boolean)
-          .sort((a, b) => Math.abs(Date.now() - new Date(a.date).getTime()) - Math.abs(Date.now() - new Date(b.date).getTime()));
-
-        setFeaturedState({
-          featuredTeam: teamCandidates[0] || null,
-          featuredMatch: matches[0] || null,
-          loading: false,
-        });
-      } catch {
-        setFeaturedState({
-          featuredTeam: teamCandidates[0] || null,
-          featuredMatch: null,
-          loading: false,
-        });
-      }
-    }
-
-    if (!searchState.loading) {
-      loadFeaturedContent();
-    }
-  }, [searchState]);
-
-  useEffect(() => {
-    setFeaturedTeamIndex(0);
-  }, [searchState.teams]);
-
-  useEffect(() => {
-    if (searchState.teams.length <= 1) {
-      return undefined;
-    }
-
-    const intervalId = setInterval(() => {
-      setFeaturedTeamIndex((current) => (current + 1) % searchState.teams.length);
-    }, 10000);
-
-    return () => clearInterval(intervalId);
-  }, [searchState.teams]);
+  }, [searchQuery, searchState.teams.length, searchState.loading]);
 
   useEffect(() => {
     async function loadTicker() {
@@ -726,7 +674,7 @@ export default function App() {
   }, [activeNav, scoresState.loaded, scoresState.loading, scoresReloadKey]);
 
   useEffect(() => {
-    if (activeNav !== 'Tables' || tablesState.loaded || tablesState.loading) {
+    if (activeNav !== 'Tables' || tablesState.loading || tablesState.data[tablesCompetition]) {
       return;
     }
 
@@ -734,30 +682,20 @@ export default function App() {
       setTablesState((current) => ({ ...current, loading: true, error: '' }));
 
       try {
-        const bundles = await Promise.allSettled(
-          COMPETITIONS.map(async (competition) => {
-            const standings = await getCompetitionStandings(competition.code);
-            return [competition.code, standings.rows];
-          }),
-        );
-
-        const successfulBundles = bundles
-          .filter((bundle) => bundle.status === 'fulfilled')
-          .map((bundle) => bundle.value);
-        const failedBundles = bundles.filter((bundle) => bundle.status === 'rejected');
-        if (!successfulBundles.length) {
-          throw new Error(failedBundles[0]?.reason?.message || 'Unable to load tables.');
-        }
+        const standings = await getCompetitionStandings(tablesCompetition);
 
         setTablesState({
-          data: Object.fromEntries(successfulBundles),
+          data: {
+            ...tablesState.data,
+            [tablesCompetition]: standings.rows,
+          },
           loading: false,
-          error: failedBundles.length ? 'Some competitions could not be loaded with the current API access.' : '',
+          error: '',
           loaded: true,
         });
       } catch (error) {
         setTablesState({
-          data: {},
+          data: tablesState.data,
           loading: false,
           error: error instanceof Error ? error.message : 'Unable to load tables.',
           loaded: true,
@@ -766,7 +704,7 @@ export default function App() {
     }
 
     loadTablesPage();
-  }, [activeNav, tablesState.loaded, tablesState.loading, tablesReloadKey]);
+  }, [activeNav, tablesCompetition, tablesState.data, tablesState.loading, tablesReloadKey]);
 
   async function handleTeamClick(team) {
     setActiveNav('TeamProfile');
@@ -815,9 +753,9 @@ export default function App() {
       .slice(0, 8)
     : [];
 
-  const rotatingFeaturedTeam = searchState.teams.length
-    ? searchState.teams[featuredTeamIndex % searchState.teams.length]
-    : featuredState.featuredTeam;
+  const featuredTeam = widgetStandings.rows[0]?.team || null;
+  const featuredMatch = tickerState.matches[0] || null;
+  const featuredLoading = tickerState.loading || widgetStandings.loading;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
@@ -846,9 +784,9 @@ export default function App() {
               <div className="main-grid" style={{ marginTop: 28 }}>
                 <div>
                   <FeaturedPanel
-                    featuredTeam={rotatingFeaturedTeam}
-                    featuredMatch={featuredState.featuredMatch}
-                    loading={featuredState.loading}
+                    featuredTeam={featuredTeam}
+                    featuredMatch={featuredMatch}
+                    loading={featuredLoading}
                     onTeamClick={handleTeamClick}
                     onScoresClick={() => setActiveNav('Scores')}
                   />
@@ -862,7 +800,10 @@ export default function App() {
                     error={widgetStandings.error}
                     onCompetitionChange={setWidgetCompetition}
                     onTeamClick={handleTeamClick}
-                    onViewFull={() => setActiveNav('Tables')}
+                    onViewFull={() => {
+                      setTablesCompetition(widgetCompetition);
+                      setActiveNav('Tables');
+                    }}
                   />
                 </div>
               </div>
@@ -909,13 +850,25 @@ export default function App() {
               Object.keys(tablesState.data).length ? (
                 <>
                   <StatusCard title="Partial Tables" message={tablesState.error} actionLabel="Retry" onAction={retryTablesLoad} />
-                  <TablesPage standingsData={tablesState.data} leagues={COMPETITIONS} onTeamClick={handleTeamClick} />
+                  <TablesPage
+                    standingsData={tablesState.data}
+                    leagues={COMPETITIONS}
+                    activeLeague={tablesCompetition}
+                    onLeagueChange={setTablesCompetition}
+                    onTeamClick={handleTeamClick}
+                  />
                 </>
               ) : (
                 <StatusCard title="Tables Unavailable" message={tablesState.error} actionLabel="Retry" onAction={retryTablesLoad} />
               )
             ) : (
-              <TablesPage standingsData={tablesState.data} leagues={COMPETITIONS} onTeamClick={handleTeamClick} />
+              <TablesPage
+                standingsData={tablesState.data}
+                leagues={COMPETITIONS}
+                activeLeague={tablesCompetition}
+                onLeagueChange={setTablesCompetition}
+                onTeamClick={handleTeamClick}
+              />
             )}
           </div>
         </div>
