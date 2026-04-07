@@ -1,4 +1,5 @@
 const FOOTBALL_DATA_BASE_URL = 'https://api.football-data.org/v4';
+const API_PREFIX = '/api/football-data';
 
 function extractErrorMessage(contentType, body, statusText) {
   if (contentType.includes('application/json')) {
@@ -47,31 +48,12 @@ export default async function handler(req, res) {
     return;
   }
 
-  const pathSegments = Array.isArray(req.query.path) ? req.query.path : [];
-  const upstreamPath = pathSegments.join('/');
-  const searchParams = new URLSearchParams();
-
-  Object.entries(req.query).forEach(([key, value]) => {
-    if (key === 'path') {
-      return;
-    }
-
-    if (Array.isArray(value)) {
-      value.forEach((item) => {
-        if (item !== undefined && item !== null && item !== '') {
-          searchParams.append(key, String(item));
-        }
-      });
-      return;
-    }
-
-    if (value !== undefined && value !== null && value !== '') {
-      searchParams.set(key, String(value));
-    }
-  });
-
-  const queryString = searchParams.toString();
-  const upstreamUrl = `${FOOTBALL_DATA_BASE_URL}/${upstreamPath}${queryString ? `?${queryString}` : ''}`;
+  const requestUrl = new URL(req.url, 'https://placeholder.vercel.app');
+  const upstreamPath = requestUrl.pathname.startsWith(API_PREFIX)
+    ? requestUrl.pathname.slice(API_PREFIX.length)
+    : '';
+  const normalizedUpstreamPath = upstreamPath.startsWith('/') ? upstreamPath : `/${upstreamPath}`;
+  const upstreamUrl = `${FOOTBALL_DATA_BASE_URL}${normalizedUpstreamPath}${requestUrl.search}`;
 
   try {
     const upstreamResponse = await fetch(upstreamUrl, {
